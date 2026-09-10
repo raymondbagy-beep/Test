@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird - PC Only</title>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            border: 3px solid #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: #70c5ce;
+        }
+        /* Mobile device blocker message */
+        #mobile-blocker {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #111;
+            color: #fff;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-size: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Warning message if opened on a mobile device -->
+<div id="mobile-blocker">
+    <h2>🖥️ PC/Laptop Only</h2>
+    <p>Sorry, this game is only playable on Desktop computers using a Mouse click.</p>
+</div>
+
+<canvas id="gameCanvas" width="400" height="500"></canvas>
+
+<script>
+// DEVICE DETECTION: Lock the game if a touch screen/mobile device is detected
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+if (isMobile) {
+    document.getElementById("mobile-blocker").style.display = "flex";
+    document.getElementById("gameCanvas").style.display = "none";
+}
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Bird object with Physics Momentum System
+let bird = {
+    x: 60,
+    y: 150,
+    width: 24,
+    height: 24,
+    gravity: 0.35,       
+    velocity: 0,        
+    jumpImpulse: -4.5,   
+    maxFallSpeed: 9,    
+    maxRiseSpeed: -7    
+};
+
+// Pipe Obstacle Settings
+let pipes = [];
+let pipeWidth = 65;
+let pipeGap = 135;
+let pipeSpeed = 2.5;
+let frameCount = 0;
+let score = 0;
+let gameOver = false;
+
+// INPUT CONTROL: RESPOND ONLY TO COMPUTER MOUSE CLICKS
+window.addEventListener("mousedown", (e) => {
+    if (isMobile) return; 
+
+    if (e.target === canvas || gameOver) {
+        flap();
+    }
+});
+
+function flap() {
+    if (gameOver) {
+        resetGame();
+    } else {
+        // Momentum logic (add upward force)
+        bird.velocity += bird.jumpImpulse; 
+
+        // Cap the upward velocity
+        if (bird.velocity < bird.maxRiseSpeed) {
+            bird.velocity = bird.maxRiseSpeed;
+        }
+    }
+}
+
+function resetGame() {
+    bird.y = 150;
+    bird.velocity = 0;
+    pipes = [];
+    score = 0;
+    frameCount = 0;
+    gameOver = false;
+    loop();
+}
+
+function loop() {
+    if (gameOver || isMobile) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Bird Physics
+    bird.velocity += bird.gravity; 
+    if (bird.velocity > bird.maxFallSpeed) {
+        bird.velocity = bird.maxFallSpeed;
+    }
+    bird.y += bird.velocity; 
+
+    // 2. Draw Bird
+    ctx.fillStyle = "#f39c12";
+    ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+
+    // Screen boundary collision
+    if (bird.y + bird.height >= canvas.height || bird.y <= 0) {
+        gameOver = true;
+    }
+
+    // 3. Pipe Logic
+    if (frameCount % 90 === 0) {
+        let topPipeHeight = Math.floor(Math.random() * (canvas.height - pipeGap - 120)) + 60;
+        pipes.push({
+            x: canvas.width,
+            top: topPipeHeight,
+            bottom: canvas.height - topPipeHeight - pipeGap,
+            passed: false
+        });
+    }
+
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= pipeSpeed;
+
+        ctx.fillStyle = "#2ecc71";
+        ctx.fillRect(pipes[i].x, 0, pipeWidth, pipes[i].top);
+        ctx.fillRect(pipes[i].x, canvas.height - pipes[i].bottom, pipeWidth, pipes[i].bottom);
+
+        if (
+            bird.x < pipes[i].x + pipeWidth &&
+            bird.x + bird.width > pipes[i].x &&
+            (bird.y < pipes[i].top || bird.y + bird.height > canvas.height - pipes[i].bottom)
+        ) {
+            gameOver = true;
+        }
+
+        if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+            score++;
+            pipes[i].passed = true;
+        }
+
+        if (pipes[i].x + pipeWidth < 0) {
+            pipes.splice(i, 1);
+        }
+    }
+
+    // 4. UI Score Display
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 24px sans-serif";
+    ctx.fillText("Score: " + score, 20, 40);
+
+    frameCount++;
+    requestAnimationFrame(loop);
+
+    // 5. Game Over Display
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 34px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 10);
+        
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "#bdc3c7";
+        ctx.fillText("Click Mouse to Play Again", canvas.width / 2, canvas.height / 2 + 35);
+        ctx.textAlign = "left"; 
+    }
+}
+
+if (!isMobile) {
+    loop();
+}
+</script>
+
+</body>
+</html>
